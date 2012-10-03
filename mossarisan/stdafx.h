@@ -11,8 +11,6 @@
 
 // TODO: プログラムに必要な追加ヘッダーをここで参照してください。
 #include <WTypes.h>
-#ifdef _DEBUG
 #include <assert.h>
-#endif
 #include <math.h>
 #include <set>

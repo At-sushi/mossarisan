@@ -14,7 +14,7 @@ struct
 	short length;
 } BufBlock[1];
 UINT NumBlock;
-std::set<short> hash_code_list[0x10000];
+std::set<USHORT> hash_code_list[0x10000];
 int maxlength;
 const int BufferSize = 16777216;
 
@@ -94,13 +94,14 @@ void LZWEncode(BYTE* Buffer, DWORD* size_buffer, BYTE* target, DWORD size_target
 		// 同じパターンがないか検索
 		WORD hash_running = CreateHash(running, 2);
 		if (!hash_code_list[hash_running].empty())
-			for (std::set<short>::iterator i = hash_code_list[hash_running].begin();
+			for (std::set<USHORT>::iterator i = hash_code_list[hash_running].begin();
 				 i != hash_code_list[hash_running].end();
 				 ++i)
 		{
 			if ( size_code[*i] > size_now )
 			{
-				short matchlen = (short)LZWCompare(codes[*i], running, size_code[*i]);
+				// 最初の2文字は一致確定しているので比較対象から外す
+				short matchlen = (size_code[*i] > 2) ? 2 + (short)LZWCompare(codes[*i] + 2, running + 2, size_code[*i] - 2) : size_code[*i];
 
 				if (matchlen > size_now)
 				{
@@ -244,7 +245,7 @@ DWORD LZWCompare(const LPBYTE mem1, const LPBYTE mem2, DWORD length)
 {
 	// TODO:完全なアセンブリ形式に置き換え
 	// というか、アセンブラで書く必要あったんだろうか、これ。
-	DWORD length_d = length;
+	register DWORD length_d = length;
 
 	// 慣れないインラインアセンブラ
 	_asm
@@ -367,11 +368,13 @@ void LZWAddDic(BYTE* running, BYTE* startpos, USHORT code, USHORT code_prev, sho
 
 				// 同じ物がないかチェック
 				if (!hash_code_list[latest].empty())
-					for (std::set<short>::iterator j = hash_code_list[latest].begin();
+					for (std::set<USHORT>::iterator j = hash_code_list[latest].begin();
 						 j != hash_code_list[latest].end();
 						 ++j)
-						if ( memcmp(codes[*j], codes[latest],
-							 (size_code[*j] < size_code[latest] ? size_code[*j] : size_code[latest])) == 0 )
+						if ( size_code[latest] <= 2 ||
+							 size_code[*j] <= 2 ||
+							 memcmp(codes[*j] + 2, codes[latest] + 2,
+							 (size_code[*j] < size_code[latest] ? size_code[*j] : size_code[latest]) - 2) == 0 )	// 最初の2文字は一致確定してるので飛ばします
 				{
 					if (size_code[*j] < size_code[latest])
 					{
