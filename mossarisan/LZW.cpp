@@ -118,9 +118,7 @@ void LZWEncode(BYTE* Buffer, DWORD* size_buffer, BYTE* target, DWORD size_target
 			size_now = 1;
 		}
 
-#ifdef _DEBUG
 		assert( (code <= 0xFFFF) && (code >= 0) );
-#endif
 		// バッファにコードをｿｼｰﾝ
 		BufBlock[0].code = (USHORT)code;
 		BufBlock[0].length = size_now;
@@ -258,7 +256,6 @@ DWORD LZWCompare(const LPBYTE mem1, const LPBYTE mem2, DWORD length)
 
 		; 比較はじめ
 		jecxz CMPFINISH	; ecxが0だとﾔｳﾞｧｲ事になるらしいので回避
-		cld
 		repe cmpsb		; ハズレにぶち当たるまで繰り返し
 		je CMPFINISH
 		inc ecx			; 最後の1文字だけ違った場合
@@ -361,15 +358,15 @@ void LZWAddDic(BYTE* running, BYTE* startpos, USHORT code, USHORT code_prev, sho
 			size_code[latest] += writting_size;
 
 			// ハッシュ作成
-			hash_code_list[CreateHash(codes[latest], size_code[latest])].insert(latest);
+			WORD hash_latest = CreateHash(codes[latest], size_code[latest]);
 
 			{
 				BOOL found = FALSE;
 
 				// 同じ物がないかチェック
-				if (!hash_code_list[latest].empty())
-					for (std::set<USHORT>::iterator j = hash_code_list[latest].begin();
-						 j != hash_code_list[latest].end();
+				if (!hash_code_list[hash_latest].empty())
+					for (std::set<USHORT>::iterator j = hash_code_list[hash_latest].begin();
+						 j != hash_code_list[hash_latest].end();
 						 ++j)
 						if ( size_code[latest] <= 2 ||
 							 size_code[*j] <= 2 ||
@@ -381,11 +378,8 @@ void LZWAddDic(BYTE* running, BYTE* startpos, USHORT code, USHORT code_prev, sho
 						// TODO:上の処理とかぶってるので統一したい
 						BOOL Update = (size_code[*j] < 4) ? TRUE : FALSE;
 
-						memcpy(codes[*j] + size_code[*j], codes[latest] + size_code[*j], size_code[latest] - size_code[*j]);
+						memcpy_s(codes[*j] + size_code[*j], 256 - size_code[*j], codes[latest] + size_code[*j], size_code[latest] - size_code[*j]);
 						size_code[*j] = size_code[latest];
-
-						if (Update)	// ハッシュ更新
-							hash_code_list[CreateHash(codes[*j], size_code[*j])].insert(*j);
 
 						// 最大一致長上げる
 						if (size_code[*j] > maxlength)
@@ -397,6 +391,11 @@ void LZWAddDic(BYTE* running, BYTE* startpos, USHORT code, USHORT code_prev, sho
 							}
 
 							maxlength = size_code[*j];
+						}
+
+						if (Update)	// ハッシュ更新
+						{
+							hash_code_list[CreateHash(codes[*j], size_code[*j])].insert(*j);
 						}
 					}
 					found = TRUE;
@@ -423,6 +422,8 @@ void LZWAddDic(BYTE* running, BYTE* startpos, USHORT code, USHORT code_prev, sho
 
 						maxlength = size_code[latest];
 					}
+
+					hash_code_list[hash_latest].insert(latest);
 				}
 			}
 		}

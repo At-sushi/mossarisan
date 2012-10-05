@@ -15,11 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include=".\LZW.asm">
-      <Filter>ソース ファイル</Filter>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include=".\LZW.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -41,5 +36,10 @@
   <ItemGroup>
     <Text Include=".\ReadMe.txt" />
     <Text Include=".\TODO.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include=".\LZW.asm">
+      <Filter>ソース ファイル</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>
