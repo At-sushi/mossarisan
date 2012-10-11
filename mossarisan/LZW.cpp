@@ -33,10 +33,10 @@ UINT frequency_table_length[0x101];
 UINT frequency_sum_code[MAXSIZE_CODES + 1];
 UINT frequency_sum_length[0x101 + 1];
 
-void LZWEncode(BYTE* Buffer, DWORD* size_buffer, BYTE* target, DWORD size_target)
+static void LZWInit(BYTE *Buffer, DWORD *size_buffer, USHORT &code_prev, short &length_prev)
 {
-	USHORT code_prev = 0;
-	short length_prev = 0;
+	code_prev = 0;
+	length_prev = 0;
 	//int running_block = 0;
 
 	*size_buffer = 0;
@@ -59,7 +59,34 @@ void LZWEncode(BYTE* Buffer, DWORD* size_buffer, BYTE* target, DWORD size_target
 		frequency_table_code[i] = 1;
 		frequency_sum_code[i + 1] = i + 1;
 	}
+}
 
+static void LZWShortenDic(int target_nokori)
+{
+	if (target_nokori < 256)
+	{
+		for (int i = 0; i < size_dic; i++)
+		{
+			// 辞書サイズが崩れるが、どうせ切った以降は使わないので（ﾟεﾟ）ｷﾆｼﾅｲ!!
+			if (size_code[i] > target_nokori)
+			{
+				size_code[i] = target_nokori;
+				if (size_code[i] == 1)
+				{
+					hash_code_list[CreateHash(codes[i], 2)].erase(i);	// 古いのは消す
+					hash_code_list[CreateHash(codes[i], size_code[i])].insert(i);
+				}
+			}
+		}
+	}
+}
+
+void LZWEncode(BYTE* Buffer, DWORD* size_buffer, BYTE* target, DWORD size_target)
+{
+	USHORT code_prev;
+	short length_prev;
+
+	LZWInit(Buffer, size_buffer, code_prev, length_prev);
 	running = target; 
 	while (running < target + size_target)
 	{
@@ -73,24 +100,8 @@ void LZWEncode(BYTE* Buffer, DWORD* size_buffer, BYTE* target, DWORD size_target
 			exit(-1);
 		}
 
-		if (target_nokori < 256)
-		{
-			for (int i = 0; i < size_dic; i++)
-			{
-				// サイズが限界の場合は切りつめる。
-				// 辞書サイズが崩れるが、どうせ切った以降は使わないので（ﾟεﾟ）ｷﾆｼﾅｲ!!
-				if (size_code[i] > target_nokori)
-				{
-					size_code[i] = target_nokori;
-					if (size_code[i] == 1)
-					{
-						hash_code_list[CreateHash(codes[i], 2)].erase(i);	// 古いのは消す
-						hash_code_list[CreateHash(codes[i], size_code[i])].insert(i);
-					}
-				}
-			}
-		}
-
+		// サイズが限界の場合は切りつめる。
+		LZWShortenDic(target_nokori);
 		// 同じパターンがないか検索
 		WORD hash_running = CreateHash(running, 2);
 		if (!hash_code_list[hash_running].empty())
@@ -141,54 +152,14 @@ void LZWEncode(BYTE* Buffer, DWORD* size_buffer, BYTE* target, DWORD size_target
 	//*size_blocks = running_block;
 
 	// 以下、テスト用部分なので最後には消すつもり。
-/*	// 最小符号化長検査、オプションで。
-	static double soge[0x1000000];
-	double zentai = 0.0; double yopparai = 0.0;
-	for (int i = 0; i < 0x1000000; i++)
-		soge[i] = 0.0;
-	for (int i = 0; i < running_block; i++)
-	{
-		soge[ BufBlock[i].code | ((USHORT)BufBlock[i].length << 16) ] += 1.0;
-		zentai += 1.0;
-	}
-	for (int i = 0; i < 0x1000000; i++) if (soge[i] > 0.0)
-	{
-		soge[i] /= zentai;
-		yopparai += log(soge[i]);
-	}*/
-
-	// テスト用、最終的にはなくなる予定。
-	/*FILE* file2 = fopen("block.bin", "wb");
-	fwrite(BufBlock, sizeof(BufBlock) / 1, 1, file2);
-	fclose(file2);*/
 }
 
 BOOL LZWDecode(BYTE* Buffer, DWORD* size_buffer, BYTE* data, DWORD size_data, DWORD size_original)
 {
-	// TODO:初期化を統一する
-	USHORT code_prev = 0;
-	short length_prev = 0;
+	USHORT code_prev;
+	short length_prev;
 
-	*size_buffer = 0;
-	running_buffer = Buffer;
-	size_dic = 0x100;
-	frequency_sum_code[0] = 0;
-	frequency_sum_length[0] = 0;
-
-	maxlength = 1;
-	frequency_table_length[0] = 0;
-	frequency_table_length[1] = 1;
-	frequency_sum_length[0] = 0;
-	frequency_sum_length[1] = 0;
-	frequency_sum_length[2] = 1;
-	for (short i = 0; i < 0x100; i++)
-	{
-		codes[i][0] = (BYTE)i;
-		size_code[i] = 1;
-		hash_code_list[CreateHash(codes[i], size_code[i])].insert(i);
-		frequency_table_code[i] = 1;
-		frequency_sum_code[i + 1] = i + 1;
-	}
+	LZWInit(Buffer, size_buffer, code_prev, length_prev);
 	RangeDecInit(data, size_data);
 
 	while (running_buffer < Buffer + size_original)
@@ -198,21 +169,7 @@ BOOL LZWDecode(BYTE* Buffer, DWORD* size_buffer, BYTE* data, DWORD size_data, DW
 		int target_nokori = size_original - (running_buffer - Buffer);
 
 		// 符号化に合わせ、サイズが限界の場合は切りつめる。
-		if (target_nokori < 256)
-		{
-			for (int i = 0; i < size_dic; i++)
-			{
-				if (size_code[i] > target_nokori)
-				{
-					size_code[i] = target_nokori;
-					if (size_code[i] == 1)
-					{
-						hash_code_list[CreateHash(codes[i], 2)].erase(i);	// 古いのは消す
-						hash_code_list[CreateHash(codes[i], size_code[i])].insert(i);
-					}
-				}
-			}
-		}
+		LZWShortenDic(target_nokori);
 
 		// たった１分レンジでチン
 		RangeDecode(data, size_data);
@@ -239,7 +196,7 @@ BOOL LZWDecode(BYTE* Buffer, DWORD* size_buffer, BYTE* data, DWORD size_data, DW
 }
 
 // データを比較して一致長を吐きます
-DWORD LZWCompare(const LPBYTE mem1, const LPBYTE mem2, DWORD length)
+static DWORD LZWCompare(const LPBYTE mem1, const LPBYTE mem2, DWORD length)
 {
 	// TODO:完全なアセンブリ形式に置き換え
 	// というか、アセンブラで書く必要あったんだろうか、これ。
@@ -268,7 +225,7 @@ CMPFINISH:
 }
 
 // ハッシュもどき作成関数、参考書からの丸写し。
-WORD CreateHash(const LPBYTE pSource, int length)
+static WORD CreateHash(const LPBYTE pSource, int length)
 {
 	WORD val1 = *pSource;
 	WORD val2 = (1 < length) ? *(pSource + 1) : 0;
@@ -281,7 +238,7 @@ WORD CreateHash(const LPBYTE pSource, int length)
 /// ハッシュもどき比較関数。
 // 型キャスト等行えば、大小違うファイルでも比較できます。
 // （未使用、重いため）
-BOOL CompHash(DWORD val1, DWORD val2, int len1, int len2)
+static BOOL CompHash(DWORD val1, DWORD val2, int len1, int len2)
 {
 	if (len1 == 1)
 		val2 = (BYTE)val2;
@@ -301,8 +258,29 @@ BOOL CompHash(DWORD val1, DWORD val2, int len1, int len2)
 	return val1 == val2;
 }
 
+
+static void LZWAddDicWord(const int j, const int latest, BOOL Update)
+{
+	// 最大一致長上げる
+	if (size_code[j] > maxlength)
+	{
+		for (int i = maxlength + 1; i <= size_code[j]; i++)
+		{
+			frequency_table_length[i] = 1;
+			frequency_sum_length[i + 1] = frequency_sum_length[i] + 1;
+		}
+
+		maxlength = size_code[j];
+	}
+
+	if (Update)	// ハッシュ更新
+	{
+		hash_code_list[CreateHash(codes[j], size_code[j])].insert(j);
+	}
+}
+
 // 辞書を追加
-void LZWAddDic(BYTE* running, BYTE* startpos, USHORT code, USHORT code_prev, short size_now, short length_prev)
+static void LZWAddDic(BYTE* running, BYTE* startpos, USHORT code, USHORT code_prev, short size_now, short length_prev)
 {
 	if (running != startpos)	// 最初はデータがないのでパス
 	{
@@ -320,20 +298,7 @@ void LZWAddDic(BYTE* running, BYTE* startpos, USHORT code, USHORT code_prev, sho
 			memcpy(codes[code_prev] + size_code[code_prev], codes[code], writting_size);
 			size_code[code_prev] += writting_size;
 
-			if (Update)	// ハッシュ更新
-				hash_code_list[CreateHash(codes[code_prev], size_code[code_prev])].insert(code_prev);
-
-			// 最大一致長上げる
-			if (size_code[code_prev] > maxlength)
-			{
-				for (int i = maxlength + 1; i <= size_code[code_prev]; i++)
-				{
-					frequency_table_length[i] = 1;
-					frequency_sum_length[i + 1] = frequency_sum_length[i] + 1;
-				}
-
-				maxlength = size_code[code_prev];
-			}
+			LZWAddDicWord(code_prev, code, 	Update);
 		}
 		else
 		{
@@ -365,7 +330,7 @@ void LZWAddDic(BYTE* running, BYTE* startpos, USHORT code, USHORT code_prev, sho
 
 				// 同じ物がないかチェック
 				if (!hash_code_list[hash_latest].empty())
-					for (std::set<USHORT>::iterator j = hash_code_list[hash_latest].begin();
+					for (auto j = hash_code_list[hash_latest].begin();
 						 j != hash_code_list[hash_latest].end();
 						 ++j)
 						if ( size_code[latest] <= 2 ||
@@ -375,28 +340,10 @@ void LZWAddDic(BYTE* running, BYTE* startpos, USHORT code, USHORT code_prev, sho
 				{
 					if (size_code[*j] < size_code[latest])
 					{
-						// TODO:上の処理とかぶってるので統一したい
-						BOOL Update = (size_code[*j] < 4) ? TRUE : FALSE;
-
 						memcpy_s(codes[*j] + size_code[*j], 256 - size_code[*j], codes[latest] + size_code[*j], size_code[latest] - size_code[*j]);
 						size_code[*j] = size_code[latest];
 
-						// 最大一致長上げる
-						if (size_code[*j] > maxlength)
-						{
-							for (int i = maxlength + 1; i <= size_code[*j]; i++)
-							{
-								frequency_table_length[i] = 1;
-								frequency_sum_length[i + 1] = frequency_sum_length[i] + 1;
-							}
-
-							maxlength = size_code[*j];
-						}
-
-						if (Update)	// ハッシュ更新
-						{
-							hash_code_list[CreateHash(codes[*j], size_code[*j])].insert(*j);
-						}
+						LZWAddDicWord(*j, latest, 	(size_code[*j] < 4) ? TRUE : FALSE);
 					}
 					found = TRUE;
 					break;
@@ -411,17 +358,7 @@ void LZWAddDic(BYTE* running, BYTE* startpos, USHORT code, USHORT code_prev, sho
 					frequency_table_code[latest] = 1;
 					frequency_sum_code[latest + 1] = frequency_sum_code[latest] + 1;
 
-					// 最大一致長上げる
-					if (size_code[latest] > maxlength)
-					{
-						for (int i = maxlength + 1; i <= size_code[latest]; i++)
-						{
-							frequency_table_length[i] = 1;
-							frequency_sum_length[i + 1] = frequency_sum_length[i] + 1;
-						}
-
-						maxlength = size_code[latest];
-					}
+					LZWAddDicWord(latest, latest, FALSE);
 
 					hash_code_list[hash_latest].insert(latest);
 				}
