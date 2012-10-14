@@ -3,7 +3,7 @@
 #include "stdafx.h"
 
 #define MAXSIZE_CODES 65536
-BYTE codes[MAXSIZE_CODES][256];
+BYTE codes[MAXSIZE_CODES + 1][256];		// +1はﾀﾞﾐｰﾃﾞｰﾀ用
 int size_dic;
 short size_code[MAXSIZE_CODES];
 BYTE* running;
@@ -304,10 +304,6 @@ static void LZWAddDic(BYTE* running, BYTE* startpos, USHORT code, USHORT code_pr
 		{
 			const int latest = size_dic;
 
-			// 最大値に到達→処理がめんどいのでキャンセル
-			if (latest >= 65536)
-				return;
-
 			size_code[latest] = 0;
 
 			// 前のコードをまず入れる
@@ -349,7 +345,7 @@ static void LZWAddDic(BYTE* running, BYTE* startpos, USHORT code, USHORT code_pr
 					break;
 				}
 
-				if (!found)
+				if (!found && (latest < 65536))
 				{
 					// 辞書一個追加しましたー
 					size_dic++;

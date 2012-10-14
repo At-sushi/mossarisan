@@ -113,6 +113,34 @@ void UpdateFreq_len(int c)
 	}
 }
 
+static void RangeEncodeExtracted(BYTE *Buffer, DWORD *size_buffer, BYTE *&sousa_buffer)
+{
+	while (low & ~MASK)
+	{
+		// ケタアガーリ
+		BYTE* i;
+
+		for (i = sousa_buffer - 1; i >= Buffer; i--)
+		{
+			int code = *i + 1;
+			*i = (BYTE)code;
+			if (code < 0x100) break;
+		}
+
+		low &= MASK;
+	}
+
+	while (Range < MIN_RANGE)
+	{
+		*(sousa_buffer++) = (BYTE)(low >> 23);
+		(*size_buffer)++;
+
+		low <<= 8;
+		low &= MASK;
+		Range <<= 8;
+	}
+}
+
 void RangeEncode(BYTE* Buffer, DWORD* size_buffer, UINT number)
 {
 	UINT temp;
@@ -128,31 +156,7 @@ void RangeEncode(BYTE* Buffer, DWORD* size_buffer, UINT number)
 	// 頻度表書き換え
 	UpdateFreq_code(BufBlock[number].code);
 
- 	while (low & ~MASK)
-	{
-		// ケタアガーリ
-		BYTE* i;
-
-		for (i = sousa_buffer - 1; i >= Buffer; i--)
-		{
-			int code = *i + 1;
-			*i = (BYTE)code;
-			if (code < 0x100) break;
-		}
-
-		low &= MASK;
-	}
-
-	while (Range < MIN_RANGE)
-	{
-		*(sousa_buffer++) = (BYTE)(low >> 23);
-		(*size_buffer)++;
-
-		low <<= 8;
-		low &= MASK;
-		Range <<= 8;
-	}
-
+	RangeEncodeExtracted(Buffer, size_buffer, sousa_buffer);
 
 	// 今度は一致長（めんどいので再利用せずにそのままコピペ）
 
@@ -164,30 +168,7 @@ void RangeEncode(BYTE* Buffer, DWORD* size_buffer, UINT number)
 	// 頻度表書き換え
 	UpdateFreq_len(BufBlock[number].length);
 
-	if (low & ~MASK)
-	{
-		// ケタアガーリ
-		BYTE* i;
-
-		for (i = sousa_buffer - 1; i >= Buffer; i--)
-		{
-			int code = *i + 1;
-			*i = (BYTE)code;
-			if (code < 0x100) break;
-		}
-
-		low &= MASK;
-	}
-
-	while (Range < MIN_RANGE)
-	{
-		*(sousa_buffer++) = (BYTE)(low >> 23);
-		(*size_buffer)++;
-
-		low <<= 8;
-		low &= MASK;
-		Range <<= 8;
-	}
+	RangeEncodeExtracted(Buffer, size_buffer, sousa_buffer);
 }
 
 void RangeEncFinish(BYTE* Buffer, DWORD* size_buffer)
