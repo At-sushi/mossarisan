@@ -12,6 +12,7 @@ extern UINT frequency_table_length[0x101];
 extern UINT frequency_sum_code[MAXSIZE_CODES + 1];
 extern UINT frequency_sum_length[0x101 + 1];
 extern int size_dic;
+extern short size_code[MAXSIZE_CODES];
 extern int maxlength;
 
 #define MAX_RANGE 0x80000000
@@ -160,7 +161,7 @@ void RangeEncode(BYTE* Buffer, DWORD* size_buffer, UINT number)
 
 	// 今度は一致長（めんどいので再利用せずにそのままコピペ）
 
-	temp = Range / frequency_sum_length[maxlength + 1];
+	temp = Range / frequency_sum_length[size_code[BufBlock[number].code] + 1];
 
 	low += temp * frequency_sum_length[ BufBlock[number].length ];
 	Range = temp * frequency_table_length[ BufBlock[number].length ];
@@ -258,7 +259,7 @@ void RangeDecode(BYTE* Buffer, DWORD size_buffer)
 
 	// 一致長ね（相変わらずコピペ）
 
-	tmp = Range / frequency_sum_length[maxlength + 1];
+	tmp = Range / frequency_sum_length[size_code[BufBlock[0].code] + 1];
 	tmp1 = code / tmp;
 
 	// 二分探索初期化

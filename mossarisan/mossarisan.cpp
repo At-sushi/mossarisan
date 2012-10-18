@@ -8,7 +8,7 @@ BOOL LZWDecode(BYTE* Buffer, DWORD* size_buffer, BYTE* data, DWORD size_data, DW
 const int BufferSize = 16777216;
 BYTE Buffer[BufferSize];
 BYTE Buffer2[BufferSize];
-const char signature[4 + 1] = "BKBP";
+const char signature[4 + 1] = "BKP2";
 
 int _tmain(int argc, char* argv[])
 {
