@@ -5,7 +5,7 @@
 #define MAXSIZE_CODES 65536
 BYTE codes[MAXSIZE_CODES + 1][256];		// +1ÇÕ¿ﬁ–∞√ﬁ∞¿óp
 int size_dic;
-short size_code[MAXSIZE_CODES];
+short size_code[MAXSIZE_CODES + 1];
 BYTE* running;
 BYTE* running_buffer;
 struct
@@ -345,7 +345,7 @@ static void LZWAddDic(BYTE* running, BYTE* startpos, USHORT code, USHORT code_pr
 					break;
 				}
 
-				if (!found && (latest < 65536))
+				if (!found && (latest < MAXSIZE_CODES))
 				{
 					// é´èëàÍå¬í«â¡ÇµÇ‹ÇµÇΩÅ[
 					size_dic++;
